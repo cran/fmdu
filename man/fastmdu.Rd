@@ -75,6 +75,7 @@ call function call
 The function follows algorithms given by de Leeuw and Heiser (1980), Heiser (1987), and Busing (2010).
 }
 \examples{
+\dontrun{
 library( smacof )
 data( "breakfast" )
 breakfast <- as.matrix( breakfast )
@@ -86,7 +87,7 @@ x <- matrix( runif( n * p ), n, p )
 y <- matrix( runif( m * p ), m, p )
 r <- fastmdu( breakfast, w, p, x, NULL, y, NULL )
 print( r )
-
+}
 }
 \references{
 de Leeuw, J., and Heiser, W. J. (1980). Multidimensional scaling with restrictions on the configuration.

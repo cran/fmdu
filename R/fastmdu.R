@@ -44,6 +44,7 @@
 #'             Unpublished doctoral dissertation, Leiden University, Leiden, the Netherlands.
 #'
 #' @examples
+#' \dontrun{
 #' library( smacof )
 #' data( "breakfast" )
 #' breakfast <- as.matrix( breakfast )
@@ -55,7 +56,7 @@
 #' y <- matrix( runif( m * p ), m, p )
 #' r <- fastmdu( breakfast, w, p, x, NULL, y, NULL )
 #' print( r )
-#'
+#' }
 #' @import smacof
 #' @export
 #' @useDynLib fmdu, .registration=TRUE

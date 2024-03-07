@@ -55,6 +55,7 @@ rmse final root mean squared error function value.
 \code{external} performs multidimensional external unfolding.
 }
 \examples{
+\dontrun{
 library( smacof )
 data( "breakfast" )
 x <- as.matrix( breakfast )
@@ -65,7 +66,7 @@ r <- smacofSym( d.col )
 print( r$conf )
 e <- external( x, fixed = r$conf )
 print( e$z )
-
+}
 
 }
 \references{

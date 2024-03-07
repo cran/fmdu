@@ -33,6 +33,7 @@
 #'             Unpublished doctoral dissertation, Leiden University, Leiden, the Netherlands.
 #'
 #' @examples
+#' \dontrun{
 #' library( smacof )
 #' data( "breakfast" )
 #' x <- as.matrix( breakfast )
@@ -43,7 +44,7 @@
 #' print( r$conf )
 #' e <- external( x, fixed = r$conf )
 #' print( e$z )
-#'
+#' }
 #'
 #' @import smacof
 #' @export
