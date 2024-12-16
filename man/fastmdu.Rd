@@ -12,6 +12,9 @@ fastmdu(
   rx = NULL,
   y = NULL,
   ry = NULL,
+  ridge = 0,
+  lasso = 0,
+  group = 0,
   MAXITER = 1024,
   FCRIT = 1e-08,
   error.check = FALSE,
@@ -36,6 +39,12 @@ If real valued, x (n by hx) contains hx independent row variables and rx (hx by 
 \item{ry}{Column restriction. If omitted, y is free and y contains the initial column coordinates.
 If logical valued, y (m by p) contains the initial column coordinates and ry (m by p) indicated free (false) and fixed (true) column coordinates.
 If real valued, y (n by hy) contains hy independent column variables and ry (hy by p) contains the initial column regression coefficients.}
+
+\item{ridge}{penalty parameter for ridge penalty}
+
+\item{lasso}{penalty parameter for lasso penalty}
+
+\item{group}{penalty parameter for grouped lasso penalty}
 
 \item{MAXITER}{maximum number of iterations (default = 1024).}
 

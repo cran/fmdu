@@ -1,40 +1,48 @@
 //
 // Copyright (c) 2020 Frank M.T.A. Busing (e-mail: busing at fsw dot leidenuniv dot nl)
 // FreeBSD or 2-Clause BSD or BSD-2 License applies, see Http://www.freebsd.org/copyright/freebsd-license.html
-// This is a permissive non-copyleft free software license that is compatible with the GNU GPL.
+// This is a permissive non-copyleft free software license that is compatible with the GNU GPL. 
 //
 
 #include "fmdu.h"
 
-double colreswgtmduneg( const size_t n, const size_t m, double** delta, double** w, const size_t p, double** x, int** fx, const size_t h, double** q, double** b, double** d, const size_t MAXITER, const double FCRIT, size_t* lastiter, double* lastdif, const bool echo )
-// Function colresmduneg() performs column restricted multidimensional unfolding allowing negative dissimilarities.
+double pencolresmdu( const size_t n, const size_t m, double** delta, const size_t p, double** x, int** fx, const size_t h, double** q, double** b, double** d, const double rlambda, const double llambda, const double glambda, const size_t MAXITER, const double FCRIT, size_t* lastiter, double* lastdif, const bool echo )
+// Function pencolresmdu() performs penalized column restricted multidimensional unfolding.
 {
-  const double EPS = DBL_EPSILON;                                              // 2.2204460492503131e-16
-  const double TOL = sqrt( EPS );                                              // 1.4901161193847656e-08
-  const double CRIT = sqrt( TOL );                                             // 0.00012207031250000000
+  const double EPS = DBL_EPSILON;                                          // 2.2204460492503131e-16
+  const double TOL = sqrt( EPS );                                          // 1.4901161193847656e-08
+  const double CRIT = sqrt( TOL );                                         // 0.00012207031250000000
   const double TINY = pow( 10.0, ( log10( EPS ) + log10( TOL ) ) / 2.0 );  // 1.8189894035458617e-12
-  const double DISCRIT = TINY;
-  const double EPSCRIT = 0.25 * TINY;
+  const double INVTINY = 1.0 / TINY;
 
   // allocate memory
   double** y = getmatrix( m, p, 0.0 );
   double** imb = getmatrix( n, m, 0.0 );
-  double** imw = getmatrix( n, m, 0.0 );
   double** xtilde = getmatrix( n, p, 0.0 );
   double** ytilde = getmatrix( m, p, 0.0 );
-  double* wc = getvector( m, 0.0 );
+  double** qtcq = getmatrix( h, h, 0.0 );
   double** hhh = getmatrix( h, h, 0.0 );
   double** hhn = getmatrix( h, n, 0.0 );
   double** hhp = getmatrix( h, p, 0.0 );
   double** hnp = getmatrix( n, p, 0.0 );
+  double* hh = getvector( h, 0.0 );
 
   // initialization
-  double scale = 0.0;
-  for ( size_t i = 1; i <= n; i++ ) {
-    for ( size_t j = 1; j <= m; j++ ) {
-      const double work = delta[i][j];
-      scale += w[i][j] * work * work;
+  double wr = ( double ) ( m );
+  double wc = ( double ) ( n );
+  for ( size_t i = 1; i <= h; i++ ) {
+    for ( size_t j = 1; j <= h; j++ ) {
+      double work = 0.0;
+      for ( size_t k = 1; k <= m; k++ ) work += q[k][i] * wc * q[k][j];
+      hhh[i][j] = qtcq[i][j] = work;
     }
+    hhh[i][i] = qtcq[i][i] += rlambda;
+  }
+  inverse( h, hhh );
+  for ( size_t k = 1; k <= h; k++ ) {
+    double work = 0.0;
+    for ( size_t j = 1; j <= m; j++ ) work += q[j][k];
+    for ( size_t i = 1; i <= n; i++ ) hhn[k][i] = work;
   }
   int nfx = 0;
   for ( size_t i = 1; i <= n; i++ ) for ( size_t k = 1; k <= p; k++ ) nfx += fx[i][k];
@@ -42,14 +50,23 @@ double colreswgtmduneg( const size_t n, const size_t m, double** delta, double**
   // update distances and calculate normalized stress
   dgemm( false, false, m, p, h, 1.0, q, b, 0.0, y );
   euclidean2( n, p, x, m, y, d );
-  double fold = 0.0;
+  double fridge = 0.0;
+  double flasso = 0.0;
+  double fgroup = 0.0;
+  for ( size_t i = 1; i <= h; i++ ) for ( size_t j = 1; j <= p; j++ ) fridge += b[i][j] * b[i][j];
+  for ( size_t i = 1; i <= h; i++ ) for ( size_t j = 1; j <= p; j++ ) flasso += fabs( b[i][j] );
+  for ( size_t i = 1; i <= h; i++ ) {
+    double work = 0.0;
+    for ( size_t j = 1; j <= p; j++ ) work += b[i][j] * b[i][j];
+    fgroup += sqrt( work );
+  }
+  double fold = rlambda * fridge + llambda * flasso + glambda * fgroup;
   for ( size_t i = 1; i <= n; i++ ) {
     for ( size_t j = 1; j <= m; j++ ) {
       const double work = delta[i][j] - d[i][j];
-      fold += w[i][j] * work * work;
+      fold += work * work;
     }
   }
-  fold /= scale;
   double fnew = 0.0;
 
   // echo intermediate results
@@ -59,24 +76,9 @@ double colreswgtmduneg( const size_t n, const size_t m, double** delta, double**
   size_t iter = 0;
   for ( iter = 1; iter <= MAXITER; iter++ ) {
 
-    // compute original B and W matrices, based on Heiser (1989)
+    // compute B matrix
     for ( size_t i = 1; i <= n; i++ ) {
-      for ( size_t j = 1; j <= m; j++ ) {
-        imb[i][j] = ( delta[i][j] < 0.0 || d[i][j] < DISCRIT ? 0.0 : w[i][j] * delta[i][j] / d[i][j] );
-        if ( delta[i][j] < 0.0 ) {
-          if ( d[i][j] < DISCRIT ) {
-            double work = fabs( delta[i][j] );
-            imw[i][j] = w[i][j] * ( EPSCRIT + work * work ) / EPSCRIT;
-          }
-          else imw[i][j] = w[i][j] * ( d[i][j] + fabs( delta[i][j] ) ) / d[i][j];
-        }
-        else imw[i][j] = w[i][j];
-      }
-    }
-    for ( size_t j = 1; j <= m; j++ ) {
-      double work = 0.0;
-      for ( size_t i = 1; i <= n; i++ ) work += imw[i][j];
-      wc[j] = work;
+      for ( size_t j = 1; j <= m; j++ ) imb[i][j] = ( d[i][j] < TINY ? 0.0 : delta[i][j] / d[i][j] );
     }
 
     // compute preliminary updates: xtilde and ytilde
@@ -100,49 +102,59 @@ double colreswgtmduneg( const size_t n, const size_t m, double** delta, double**
     }
 
     // update x
-    dgemm( false, false, m, p, n, 1.0, w, y, 0.0, hnp );
+    for ( size_t k = 1; k <= p; k++ ) {
+      double work = 0.0;
+      for ( size_t j = 1; j <= m; j++ ) work += y[j][k];
+      for ( size_t i = 1; i <= n; i++ ) hnp[i][k] = work;
+    }
     for ( size_t i = 1; i <= n; i++ ) {
-      double rsw = 0.0;
-      for ( size_t j = 1; j <= m; j++ ) rsw += imw[i][j];
-      for ( size_t j = 1; j <= p; j++ ) if ( fx[i][j] == 0 ) x[i][j] = ( xtilde[i][j] + hnp[i][j] ) / rsw;
+      for ( size_t j = 1; j <= p; j++ ) if ( fx[i][j] == 0 ) x[i][j] = ( xtilde[i][j] + hnp[i][j] ) / wr;
     }
 
     // update b
     for ( size_t i = 1; i <= h; i++ ) {
-      for ( size_t j = 1; j <= h; j++ ) {
-        double work = 0.0;
-        for ( size_t k = 1; k <= m; k++ ) work += q[k][i] * wc[k] * q[k][j];
-        hhh[i][j] = work;
-      }
+      double work = 0.0;
+      for ( size_t j = 1; j <= p; j++ ) work += b[i][j] * b[i][j];
+      work = sqrt( work );
+      hh[i] = 0.5 * glambda * ( work < TINY ? INVTINY : 1.0 / work );
     }
-    inverse( h, hhh );
-    dgemm( true, true, h, n, m, 1.0, q, imw, 0.0, hhn );
     dgemm( false, false, h, p, n, 1.0, hhn, x, 0.0, hhp );
-    for ( size_t i = 1; i <= h; i++ ) {
-      for ( size_t j = 1; j <= p; j++ ) {
+    dgemm( true, false, h, p, n, 1.0, q, ytilde, 1.0, hhp );
+    for ( size_t k = 1; k <= p; k++ ) {
+      dcopy( h * h, &qtcq[1][1], 1, &hhh[1][1], 1 );
+      for ( size_t i = 1; i <= h; i++ ) hhh[i][i] += 0.5 * llambda * ( fabs( b[i][k] ) < TINY ? INVTINY : 1.0 / fabs( b[i][k] ) );
+      for ( size_t i = 1; i <= h; i++ ) hhh[i][i] += hh[i];
+      inverse( h, hhh );
+      for ( size_t i = 1; i <= h; i++ ) {
         double work = 0.0;
-        for ( size_t k = 1; k <= m; k++ ) work += q[k][i] * ytilde[k][j];
-        hhp[i][j] += work;
+        for ( size_t j = 1; j <= h; j++ ) work += hhh[i][j] * hhp[j][k];
+        b[i][k] = work;
       }
     }
-    dgemm( false, false, h, p, h, 1.0, hhh, hhp, 0.0, b );
 
-    // update y
+    // update y      
     dgemm( false, false, m, p, h, 1.0, q, b, 0.0, y );
 
     // update distances and calculate normalized stress
     euclidean2( n, p, x, m, y, d );
-    fnew = 0.0;
+    fridge = flasso = fgroup = 0.0;
+    for ( size_t i = 1; i <= h; i++ ) for ( size_t j = 1; j <= p; j++ ) fridge += b[i][j] * b[i][j];
+    for ( size_t i = 1; i <= h; i++ ) for ( size_t j = 1; j <= p; j++ ) flasso += fabs( b[i][j] );
+    for ( size_t i = 1; i <= h; i++ ) {
+      double work = 0.0;
+      for ( size_t j = 1; j <= p; j++ ) work += b[i][j] * b[i][j];
+      fgroup += sqrt( work );
+    }
+    fnew = rlambda * fridge + llambda * flasso + glambda * fgroup;
     for ( size_t i = 1; i <= n; i++ ) {
       for ( size_t j = 1; j <= m; j++ ) {
         double work = delta[i][j] - d[i][j];
-        fnew += w[i][j] * work * work;
+        fnew += work * work;
       }
     }
-    fnew /= scale;
 
     // echo intermediate results
-    if ( echo == true ) echoprogress( iter, fold, fold, fnew );
+    if ( echo == true ) echoprogress( iter, fold, fold, fnew ); 
 
     // check convergence
     ( *lastdif ) = fold - fnew;
@@ -159,20 +171,20 @@ double colreswgtmduneg( const size_t n, const size_t m, double** delta, double**
   // de-allocate memory
   freematrix( y );
   freematrix( imb );
-  freematrix( imw );
   freematrix( xtilde );
   freematrix( ytilde );
-  freevector( wc );
+  freematrix( qtcq );
   freematrix( hhh );
   freematrix( hhn );
   freematrix( hhp );
   freematrix( hnp );
+  freevector( hh );
 
   return( fnew );
-} // colreswgtmduneg
+} // pencolresmdu
 
-void Ccolreswgtmduneg( int* rn, int* rm, double* rdelta, double* rw, int* rp, double* rx, int* rfx, int* rh, double* rq, double* rb, double* rd, int* rmaxiter, double* rfdif, double* rfvalue, int* recho )
-// Function Ccolresmduneg() performs column restricted multidimensional unfolding allowing negative dissimilarities.
+void Cpencolresmdu( int* rn, int* rm, double* rdelta, int* rp, double* rx, int* rfx, int* rh, double* rq, double* rb, double* rd, double* rrlambda, double* rllambda, double* rglambda, int* rmaxiter, double* rfdif, double* rfvalue, int* recho )
+// Function Ccolresmdu() performs column restricted multidimensional unfolding.
 {
   // transfer to C
   size_t n = *rn;
@@ -182,24 +194,25 @@ void Ccolreswgtmduneg( int* rn, int* rm, double* rdelta, double* rw, int* rp, do
   size_t MAXITER = *rmaxiter;
   double** delta = getmatrix( n, m, 0.0 );
   for ( size_t j = 1, k = 0; j <= m; j++ ) for ( size_t i = 1; i <= n; i++, k++ ) delta[i][j] = rdelta[k];
-  double** w = getmatrix( n, m, 0.0 );
-  for ( size_t j = 1, k = 0; j <= m; j++ ) for ( size_t i = 1; i <= n; i++, k++ ) w[i][j] = rw[k];
   double** x = getmatrix( n, p, 0.0 );
   for ( size_t j = 1, k = 0; j <= p; j++ ) for ( size_t i = 1; i <= n; i++, k++ ) x[i][j] = rx[k];
   int** fx = getimatrix( n, p, 0 );
   for ( size_t j = 1, k = 0; j <= p; j++ ) for ( size_t i = 1; i <= n; i++, k++ ) fx[i][j] = rfx[k];
-  double** q = getmatrix( n, h, 0.0 );
-  for ( size_t j = 1, k = 0; j <= h; j++ ) for ( size_t i = 1; i <= n; i++, k++ ) q[i][j] = rq[k];
+  double** q = getmatrix( m, h, 0.0 );
+  for ( size_t j = 1, k = 0; j <= h; j++ ) for ( size_t i = 1; i <= m; i++, k++ ) q[i][j] = rq[k];
   double** b = getmatrix( h, p, 0.0 );
   for ( size_t j = 1, k = 0; j <= p; j++ ) for ( size_t i = 1; i <= h; i++, k++ ) b[i][j] = rb[k];
   double** d = getmatrix( n, m, 0.0 );
+  const double rlambda = *rrlambda;
+  const double llambda = *rllambda;
+  const double glambda = *rglambda;
   double FCRIT = *rfdif;
   bool echo = ( *recho ) != 0;
 
   // run function
   size_t lastiter = 0;
   double lastdif = 0.0;
-  double fvalue = colreswgtmduneg( n, m, delta, w, p, x, fx, h, q, b, d, MAXITER, FCRIT, &lastiter, &lastdif, echo );
+  double fvalue = pencolresmdu( n, m, delta, p, x, fx, h, q, b, d, rlambda, llambda, glambda, MAXITER, FCRIT, &lastiter, &lastdif, echo );
 
   // transfer to R
   for ( size_t j = 1, k = 0; j <= p; j++ ) for ( size_t i = 1; i <= n; i++, k++ ) rx[k] = x[i][j];
@@ -212,11 +225,10 @@ void Ccolreswgtmduneg( int* rn, int* rm, double* rdelta, double* rw, int* rp, do
 
   // de-allocate memory
   freematrix( delta );
-  freematrix( w );
   freematrix( x );
   freeimatrix( fx );
   freematrix( q );
   freematrix( b );
   freematrix( d );
 
-} // Ccolreswgtmduneg
+} // Cpencolresmdu

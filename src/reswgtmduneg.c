@@ -43,8 +43,8 @@ double reswgtmduneg( const size_t n, const size_t m, double** delta, double** w,
   }
 
   // update distances and calculate normalized stress
-  gemm( false, false, n, p, hx, 1.0, qx, bx, 0.0, x );
-  gemm( false, false, m, p, hy, 1.0, qy, by, 0.0, y );
+  dgemm( false, false, n, p, hx, 1.0, qx, bx, 0.0, x );
+  dgemm( false, false, m, p, hy, 1.0, qy, by, 0.0, y );
   euclidean2( n, p, x, m, y, d );
   double fold = 0.0;
   for ( size_t i = 1; i <= n; i++ ) {
@@ -117,8 +117,8 @@ double reswgtmduneg( const size_t n, const size_t m, double** delta, double** w,
       }
     }
     inverse( hx, hxx );
-    gemm( true, false, hx, m, n, 1.0, qx, imw, 0.0, hhm );
-    gemm( false, false, hx, p, m, 1.0, hhm, y, 0.0, hhp );
+    dgemm( true, false, hx, m, n, 1.0, qx, imw, 0.0, hhm );
+    dgemm( false, false, hx, p, m, 1.0, hhm, y, 0.0, hhp );
     for ( size_t i = 1; i <= hx; i++ ) {
       for ( size_t j = 1; j <= p; j++ ) {
         double work = 0.0;
@@ -126,10 +126,10 @@ double reswgtmduneg( const size_t n, const size_t m, double** delta, double** w,
         hhp[i][j] += work;
       }
     }
-    gemm( false, false, hx, p, hx, 1.0, hxx, hhp, 0.0, bx );
+    dgemm( false, false, hx, p, hx, 1.0, hxx, hhp, 0.0, bx );
 
     // update x
-    gemm( false, false, n, p, hx, 1.0, qx, bx, 0.0, x );
+    dgemm( false, false, n, p, hx, 1.0, qx, bx, 0.0, x );
 
     // update by
     for ( size_t i = 1; i <= hy; i++ ) {
@@ -140,8 +140,8 @@ double reswgtmduneg( const size_t n, const size_t m, double** delta, double** w,
       }
     }
     inverse( hy, hyy );
-    gemm( true, true, hy, n, m, 1.0, qy, imw, 0.0, hhn );
-    gemm( false, false, hy, p, n, 1.0, hhn, x, 0.0, hhp );
+    dgemm( true, true, hy, n, m, 1.0, qy, imw, 0.0, hhn );
+    dgemm( false, false, hy, p, n, 1.0, hhn, x, 0.0, hhp );
     for ( size_t i = 1; i <= hy; i++ ) {
       for ( size_t j = 1; j <= p; j++ ) {
         double work = 0.0;
@@ -149,10 +149,10 @@ double reswgtmduneg( const size_t n, const size_t m, double** delta, double** w,
         hhp[i][j] += work;
       }
     }
-    gemm( false, false, hy, p, hy, 1.0, hyy, hhp, 0.0, by );
+    dgemm( false, false, hy, p, hy, 1.0, hyy, hhp, 0.0, by );
 
     // update y
-    gemm( false, false, m, p, hy, 1.0, qy, by, 0.0, y );
+    dgemm( false, false, m, p, hy, 1.0, qy, by, 0.0, y );
 
     // update distances and calculate normalized stress
     euclidean2( n, p, x, m, y, d );

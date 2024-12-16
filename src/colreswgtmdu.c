@@ -52,12 +52,12 @@ double colreswgtmdu( const size_t n, const size_t m, double** delta, double** w,
     }
   }
   inverse( h, hhh );
-  gemm( true, true, h, n, m, 1.0, q, w, 0.0, hhn );
+  dgemm( true, true, h, n, m, 1.0, q, w, 0.0, hhn );
   int nfx = 0;
   for ( size_t i = 1; i <= n; i++ ) for ( size_t k = 1; k <= p; k++ ) nfx += fx[i][k];
 
   // update distances and calculate normalized stress
-  gemm( false, false, m, p, h, 1.0, q, b, 0.0, y );
+  dgemm( false, false, m, p, h, 1.0, q, b, 0.0, y );
   euclidean2( n, p, x, m, y, d );
   double fold = 0.0;
   for ( size_t i = 1; i <= n; i++ ) {
@@ -102,13 +102,13 @@ double colreswgtmdu( const size_t n, const size_t m, double** delta, double** w,
     }
 
     // update x
-    gemm( false, false, m, p, n, 1.0, w, y, 0.0, hnp );
+    dgemm( false, false, m, p, n, 1.0, w, y, 0.0, hnp );
     for ( size_t i = 1; i <= n; i++ ) {
       for ( size_t j = 1; j <= p; j++ ) if ( fx[i][j] == 0 ) x[i][j] = ( xtilde[i][j] + hnp[i][j] ) / wr[i];
     }
 
     // update b
-    gemm( false, false, h, p, n, 1.0, hhn, x, 0.0, hhp );
+    dgemm( false, false, h, p, n, 1.0, hhn, x, 0.0, hhp );
     for ( size_t i = 1; i <= h; i++ ) {
       for ( size_t j = 1; j <= p; j++ ) {
         double work = 0.0;
@@ -116,10 +116,10 @@ double colreswgtmdu( const size_t n, const size_t m, double** delta, double** w,
         hhp[i][j] += work;
       }
     }
-    gemm( false, false, h, p, h, 1.0, hhh, hhp, 0.0, b );
+    dgemm( false, false, h, p, h, 1.0, hhh, hhp, 0.0, b );
 
     // update y
-    gemm( false, false, m, p, h, 1.0, q, b, 0.0, y );
+    dgemm( false, false, m, p, h, 1.0, q, b, 0.0, y );
 
     // update distances and calculate normalized stress
     euclidean2( n, p, x, m, y, d );

@@ -51,7 +51,7 @@ double rowresmdu( const size_t n, const size_t m, double** delta, const size_t p
   for ( size_t j = 1; j <= m; j++ ) for ( size_t k = 1; k <= p; k++ ) nfy += fy[j][k];
 
   // update distances and calculate normalized stress
-  gemm( false, false, n, p, h, 1.0, q, b, 0.0, x );
+  dgemm( false, false, n, p, h, 1.0, q, b, 0.0, x );
   euclidean2( n, p, x, m, y, d );
   double fold = 0.0;
   for ( size_t i = 1; i <= n; i++ ) {
@@ -96,7 +96,7 @@ double rowresmdu( const size_t n, const size_t m, double** delta, const size_t p
     }
 
     // update b
-    gemm( false, false, h, p, m, 1.0, hhm, y, 0.0, hhp );
+    dgemm( false, false, h, p, m, 1.0, hhm, y, 0.0, hhp );
     for ( size_t i = 1; i <= h; i++ ) {
       for ( size_t j = 1; j <= p; j++ ) {
         double work = 0.0;
@@ -104,10 +104,10 @@ double rowresmdu( const size_t n, const size_t m, double** delta, const size_t p
         hhp[i][j] += work;
       }
     }
-    gemm( false, false, h, p, h, 1.0, hhh, hhp, 0.0, b );
+    dgemm( false, false, h, p, h, 1.0, hhh, hhp, 0.0, b );
 
     // update x
-    gemm( false, false, n, p, h, 1.0, q, b, 0.0, x );
+    dgemm( false, false, n, p, h, 1.0, q, b, 0.0, x );
 
     // update y
     for ( size_t k = 1; k <= p; k++ ) {

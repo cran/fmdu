@@ -10,19 +10,19 @@ static void pdist( const size_t n, double* d, double* r )
 // create probabilities from distances
 {
   double TOL = sqrt( DBL_EPSILON );
-  double sm = sum( n, &d[1], 1 ) + ( double )( n ) * TOL;
+  double sm = dsum( n, &d[1], 1 ) + ( double )( n ) * TOL;
   for ( size_t i = 1; i <= n; i++ ) r[i] = sm / ( d[i] + TOL );
-  double alpha = sum( n, &r[1], 1 );
+  double alpha = dsum( n, &r[1], 1 );
   if ( iszero( alpha ) ) alpha = TOL;
-  scal( n, 1.0 / alpha, &r[1], 1 );
+  dscal( n, 1.0 / alpha, &r[1], 1 );
 } // pdist
 
 double external( const size_t n, const size_t m, double** delta, double** w, const size_t p, double** fixed, double** z, double** d, const size_t MAXITER, const double FCRIT, size_t* lastiter, double* lastdif, const bool echo )
-// Function extermal() performs external unfolding.
+// Function external() performs external unfolding.
 {
-  const double EPS = DBL_EPSILON;                                          // 2.2204460492503131e-16
-  const double TOL = sqrt( EPS );                                          // 1.4901161193847656e-08
-  const double CRIT = sqrt( TOL );                                         // 0.00012207031250000000
+  const double EPS = DBL_EPSILON;   // 2.2204460492503131e-16
+  const double TOL = sqrt( EPS );   // 1.4901161193847656e-08
+  const double CRIT = sqrt( TOL );  // 0.00012207031250000000
 
   // allocate memory
   double* b = getvector( m, 0.0 );
@@ -36,11 +36,11 @@ double external( const size_t n, const size_t m, double** delta, double** w, con
     for ( size_t j = 1; j <= m; j++ ) dwork[j] = delta[i][j];
 
     // init variables
-    const double sumw = sum( m, &w[i][1], 1 );
-    const double scale = wssq( m, &dwork[1], 1, &w[i][1], 1 );
+    const double sumw = dsum( m, &w[i][1], 1 );
+    const double scale = dwssq( m, &dwork[1], 1, &w[i][1], 1 );
 
     // initial z: probability weighted average
-    if ( iszero( ssq( p, &z[i][1], 1 ) ) ) {
+    if ( iszero( dssq( p, &z[i][1], 1 ) ) ) {
       double* probs = getvector( m, 0.0 );
       pdist( m, dwork, probs );
       for ( size_t k = 1; k <= p; k++ ) {
@@ -62,7 +62,7 @@ double external( const size_t n, const size_t m, double** delta, double** w, con
     }
 
     // administration: function value
-    double fold = wnrm2( m, &dwork[1], 1, &d[i][1], 1, &w[i][1], 1 );
+    double fold = wrmse( m, &dwork[1], 1, &d[i][1], 1, &w[i][1], 1 );
     fold /= scale;
     double fnew = 0.0;
 
@@ -74,18 +74,18 @@ double external( const size_t n, const size_t m, double** delta, double** w, con
     for ( iter = 1; iter <= MAXITER; iter++ ) {
 
       // scale delta
-      const double lower = wssq( m, &dwork[1], 1, &w[i][1], 1 );
-      const double upper = dot( m, &dwork[1], 1, &d[i][1], 1 );
+      const double lower = dwssq( m, &dwork[1], 1, &w[i][1], 1 );
+      const double upper = ddot( m, &dwork[1], 1, &d[i][1], 1 );
       const double alpha = ( lower < DBL_EPSILON ? 1.0 : upper / lower );
-      scal( m, alpha, &dwork[1], 1 );
+      dscal( m, alpha, &dwork[1], 1 );
 
       // update configuration
       for ( size_t j = 1; j <= m; j++ ) b[j] = ( isnotzero( d[i][j] ) ? w[i][j] * dwork[j] / d[i][j] : 0.0 );
 
       // update: xtilde
-      const double pi = sum( m, &b[1], 1 );
+      const double pi = dsum( m, &b[1], 1 );
       for ( size_t k = 1; k <= p; k++ ) {
-        const double by = dot( m, &b[1], 1, &fixed[1][k], p );
+        const double by = ddot( m, &b[1], 1, &fixed[1][k], p );
         double xtilde = pi * z[i][k] - by;
         for ( size_t j = 1; j <= m; j++ ) xtilde += w[i][j] * fixed[j][k];
         z[i][k] = xtilde / sumw;
@@ -100,7 +100,7 @@ double external( const size_t n, const size_t m, double** delta, double** w, con
         }
         d[i][j] = sqrt( sum );
       }
-      fnew = wnrm2( m, &dwork[1], 1, &d[i][1], 1, &w[i][1], 1 );
+      fnew = wrmse( m, &dwork[1], 1, &d[i][1], 1, &w[i][1], 1 );
       fnew /= scale;
 
       // echo intermediate results
